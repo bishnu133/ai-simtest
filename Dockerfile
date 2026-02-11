@@ -8,11 +8,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project files
-COPY ../../../Downloads/files/pyproject.toml .
+COPY pyproject.toml .
 COPY src/ src/
 COPY configs/ configs/
 
-# Install Python dependencies
+# Re-install after copying source so entry point resolves
 RUN pip install --no-cache-dir -e ".[dev]"
 
 # Download NLTK data for Presidio
@@ -21,4 +21,4 @@ RUN python -c "import nltk; nltk.download('punkt')" 2>/dev/null || true
 EXPOSE 8000
 
 # Default: run the API server
-CMD ["python", "-m", "src.cli", "serve"]
+CMD ["simtest", "serve"]

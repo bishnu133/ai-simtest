@@ -78,7 +78,7 @@ ui = [
 ]
 
 [project.scripts]
-simtest = "ai_simtest.cli:main"
+simtest = "src.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -215,7 +215,7 @@ class ConversationSimulator:
         """
         conversation = Conversation(
             persona_id=persona.id,
-            start_time=datetime.utcnow(),
+            start_time=datetime.now(timezone.utc),
         )
 
         # Track message history for the bot API
@@ -235,7 +235,7 @@ class ConversationSimulator:
                 conversation.turns.append(Turn(
                     speaker="user",
                     message=user_message,
-                    timestamp=datetime.utcnow(),
+                    timestamp=datetime.now(timezone.utc),
                     metadata={"turn_number": turn_num},
                 ))
 
@@ -250,7 +250,7 @@ class ConversationSimulator:
                 conversation.turns.append(Turn(
                     speaker="bot",
                     message=bot_response,
-                    timestamp=datetime.utcnow(),
+                    timestamp=datetime.now(timezone.utc),
                     latency_ms=latency,
                     metadata={"turn_number": turn_num},
                 ))
@@ -276,7 +276,7 @@ class ConversationSimulator:
                 )
                 break
 
-        conversation.end_time = datetime.utcnow()
+        conversation.end_time = datetime.now(timezone.utc)
 
         logger.info(
             "conversation_end",

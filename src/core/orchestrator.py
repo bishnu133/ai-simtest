@@ -94,6 +94,11 @@ class SimulationOrchestrator:
         start_time = time.time()
 
         try:
+            # Step 0: Validate LLM providers
+            from src.core.llm_client import LLMProviderManager
+            provider_mgr = LLMProviderManager()
+            await provider_mgr.check_all_providers()
+
             # Step 1: Setup judges
             self._update_status(SimulationStatus.GENERATING_PERSONAS)
             await self.setup_judges()

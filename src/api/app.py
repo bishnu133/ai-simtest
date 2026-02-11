@@ -186,8 +186,12 @@ async def get_simulation_report(sim_id: str):
     )
 
 
+class ExportRequest(BaseModel):
+    formats: list[str] = Field(default_factory=lambda: ["jsonl", "csv", "summary"])
+
+
 @app.post("/simulations/{sim_id}/export")
-async def export_simulation(sim_id: str, formats: list[str] | None = None):
+async def export_simulation(sim_id: str, req: ExportRequest | None = None):
     """Export simulation results in various formats."""
     orch = _simulations.get(sim_id)
     if not orch:
@@ -196,9 +200,10 @@ async def export_simulation(sim_id: str, formats: list[str] | None = None):
     if orch.run.status != SimulationStatus.COMPLETED:
         raise HTTPException(status_code=400, detail="Simulation not yet completed")
 
+    formats = req.formats if req else ["jsonl", "csv", "summary"]
     exported = orch.export_results(
         output_dir=f"./reports/{sim_id}",
-        formats=formats or ["jsonl", "csv", "summary"],
+        formats=formats,
     )
     return {"exported_files": exported}
 

@@ -210,7 +210,7 @@ class RelevanceJudge(BaseJudge):
         )
 
     def _heuristic_relevance(self, question: str, response: str) -> float:
-        """Simple keyword overlap relevance score."""
+        """Keyword overlap relevance score with stemming and length boost."""
         q_words = set(question.lower().split())
         r_words = set(response.lower().split())
 
@@ -220,7 +220,8 @@ class RelevanceJudge(BaseJudge):
                       "would", "could", "should", "may", "might", "can", "to",
                       "of", "in", "for", "on", "with", "at", "by", "from", "i",
                       "you", "me", "my", "your", "it", "this", "that", "what",
-                      "how", "and", "or", "but", "not", "no", "so", "if"}
+                      "how", "and", "or", "but", "not", "no", "so", "if", "want",
+                      "need", "please", "hi", "hello", "hey"}
 
         q_words -= stop_words
         r_words -= stop_words
@@ -228,11 +229,22 @@ class RelevanceJudge(BaseJudge):
         if not q_words:
             return 0.7  # Can't judge
 
+        # Exact overlap
         overlap = q_words & r_words
+
+        # Partial stem matching (e.g., "refund" matches "refunded", "order" matches "ordered")
+        for qw in q_words - overlap:
+            for rw in r_words:
+                if qw[:4] == rw[:4] and len(qw) >= 4:  # Share first 4 chars
+                    overlap.add(qw)
+                    break
+
         score = len(overlap) / len(q_words)
 
-        # Boost if response is reasonably long (not empty/minimal)
+        # Boost if response is reasonably long (shows effort)
+        if len(response.split()) > 8:
+            score = min(score + 0.15, 1.0)
         if len(response.split()) > 20:
-            score = min(score + 0.2, 1.0)
+            score = min(score + 0.15, 1.0)
 
         return score

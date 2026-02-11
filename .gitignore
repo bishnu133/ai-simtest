@@ -3,6 +3,8 @@
 venv/
 __pycache__/
 *.py[cod]
+*$py.class
+*.db
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -39,9 +41,11 @@ __pycache__/
 *.pyd
 *.pyo
 *.egg-info/
+*.egg
 dist/
 build/
 .eggs/
+*.so
 .venv/
 venv/
 ENV/
@@ -78,7 +82,9 @@ tmp/
 temp/
 .cache/
 .DS_Store
+simtest.db
 Thumbs.db
+*.log
 
 # ----------------------
 # IDEs / editors
