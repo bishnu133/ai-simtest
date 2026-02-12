@@ -302,7 +302,8 @@ class TestJudgesIntegration:
             context="Standard shipping takes 3-5 business days. Express shipping costs $9.99 for 1-2 day delivery.",
         )
 
-        assert result.score < 0.8  # Should have low similarity
+        assert result.passed is False  # Should fail grounding check
+        assert result.evidence["max_similarity"] < 0.5  # Raw similarity is low
 
     @pytest.mark.asyncio
     async def test_grounding_judge_no_documentation(self):
