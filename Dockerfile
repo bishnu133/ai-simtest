@@ -8,12 +8,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project files
-COPY pyproject.toml .
+COPY pyproject.toml README.md ./
 COPY src/ src/
 COPY configs/ configs/
 
-# Re-install after copying source so entry point resolves
-RUN pip install --no-cache-dir -e ".[dev]"
+# Install package (non-editable for production)
+RUN pip install --no-cache-dir ".[dev]"
 
 # Download NLTK data for Presidio
 RUN python -c "import nltk; nltk.download('punkt')" 2>/dev/null || true

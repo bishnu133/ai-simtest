@@ -72,9 +72,16 @@ dev = [
     "mypy>=1.8.0",
     "pre-commit>=3.6.0",
 ]
+docs = [
+    "PyPDF2>=3.0.0",
+    "python-docx>=1.1.0",
+]
 ui = [
     "streamlit>=1.31.0",
     "plotly>=5.18.0",
+]
+all = [
+    "ai-simtest[docs,ui,dev]",
 ]
 
 [project.scripts]

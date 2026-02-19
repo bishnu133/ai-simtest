@@ -4,7 +4,6 @@ Report Generator - Creates comprehensive simulation test reports.
 
 from __future__ import annotations
 
-from collections import Counter
 from datetime import datetime
 
 from src.core.logging import get_logger
@@ -104,23 +103,60 @@ class ReportGenerator:
     def _find_failure_patterns(
         self, judged: list[JudgedConversation]
     ) -> list[FailurePattern]:
-        """Identify recurring failure patterns."""
-        issue_counter: Counter = Counter()
-        issue_convs: dict[str, list[str]] = {}
-
+        """Identify recurring failure patterns with semantic deduplication."""
+        # Collect all failure messages with their conversation IDs
+        raw_issues: list[tuple[str, str]] = []  # (issue_text, conversation_id)
         for jc in judged:
             for fm in jc.failure_modes:
-                issue_counter[fm] += 1
-                issue_convs.setdefault(fm, []).append(jc.conversation.id)
+                raw_issues.append((fm, jc.conversation.id))
+
+        if not raw_issues:
+            return []
+
+        # Group similar issues together using simple word-overlap similarity
+        groups: list[dict] = []  # [{canonical, issues, conv_ids}]
+
+        for issue_text, conv_id in raw_issues:
+            matched = False
+            issue_words = set(issue_text.lower().split())
+
+            for group in groups:
+                canonical_words = set(group["canonical"].lower().split())
+                # Jaccard similarity
+                if not canonical_words or not issue_words:
+                    continue
+                intersection = canonical_words & issue_words
+                union = canonical_words | issue_words
+                similarity = len(intersection) / len(union) if union else 0
+
+                if similarity > 0.5:  # Similar enough to group together
+                    group["count"] += 1
+                    group["conv_ids"].add(conv_id)
+                    # Keep the longer description as canonical
+                    if len(issue_text) > len(group["canonical"]):
+                        group["canonical"] = issue_text
+                    matched = True
+                    break
+
+            if not matched:
+                groups.append({
+                    "canonical": issue_text,
+                    "count": 1,
+                    "conv_ids": {conv_id},
+                })
+
+        # Sort by frequency and build patterns
+        groups.sort(key=lambda g: g["count"], reverse=True)
 
         patterns = []
-        for issue, count in issue_counter.most_common(10):
+        for group in groups[:10]:
+            freq = group["count"]
             patterns.append(FailurePattern(
-                pattern_name=issue[:80],
-                description=issue,
-                frequency=count,
-                severity=Severity.HIGH if count > len(judged) * 0.2 else Severity.MEDIUM,
-                example_conversation_ids=issue_convs[issue][:3],
+                pattern_name=group["canonical"][:80],
+                description=group["canonical"],
+                frequency=freq,
+                severity=Severity.HIGH if freq > len(judged) * 0.2 else Severity.MEDIUM,
+                example_conversation_ids=list(group["conv_ids"])[:3],
             ))
 
         return patterns

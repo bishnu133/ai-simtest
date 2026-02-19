@@ -61,8 +61,15 @@ class JudgeEngine:
     Orchestrates multiple judges to evaluate all bot responses in conversations.
     """
 
-    def __init__(self, judges: list[BaseJudge] | None = None):
+    def __init__(
+        self,
+        judges: list[BaseJudge] | None = None,
+        pass_threshold: float = 0.7,
+        warn_threshold: float = 0.5,
+    ):
         self.judges: list[BaseJudge] = judges or []
+        self.pass_threshold = pass_threshold
+        self.warn_threshold = warn_threshold
 
     def add_judge(self, judge: BaseJudge) -> None:
         self.judges.append(judge)
@@ -204,10 +211,10 @@ class JudgeEngine:
         # Simple average score
         weighted_score = sum(j.score for j in judgments) / len(judgments)
 
-        # Determine label
-        if weighted_score >= 0.8:
+        # Determine label based on configurable thresholds
+        if weighted_score >= self.pass_threshold:
             label = JudgmentLabel.PASS
-        elif weighted_score >= 0.6:
+        elif weighted_score >= self.warn_threshold:
             label = JudgmentLabel.WARNING
         else:
             label = JudgmentLabel.FAIL

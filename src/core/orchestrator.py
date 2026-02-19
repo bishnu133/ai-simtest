@@ -41,7 +41,10 @@ class SimulationOrchestrator:
         self.conversation_simulator = ConversationSimulator(
             max_parallel=config.max_parallel_conversations,
         )
-        self.judge_engine = JudgeEngine()
+        self.judge_engine = JudgeEngine(
+            pass_threshold=config.pass_threshold,
+            warn_threshold=config.warn_threshold,
+        )
         self.report_generator = ReportGenerator()
         self.exporter = DatasetExporter()
         self.run = SimulationRun(id=config.id, config=config)
@@ -78,6 +81,22 @@ class SimulationOrchestrator:
 
         await self.judge_engine.initialize_all()
         logger.info("judges_ready", count=len(self.judge_engine.judges))
+
+    async def generate_personas_only(self) -> list[Persona]:
+        """Generate personas without running the full simulation (for preview)."""
+        from src.core.llm_client import LLMProviderManager
+        provider_mgr = LLMProviderManager()
+        await provider_mgr.check_all_providers()
+
+        personas = await self.persona_generator.generate(
+            bot_description=self._build_bot_description(),
+            documentation=self.config.documentation,
+            success_criteria=self.config.success_criteria,
+            num_personas=self.config.num_personas,
+            persona_type_distribution=self.config.persona_types,
+        )
+        self.run.personas = personas
+        return personas
 
     async def run_simulation(
         self, personas: list[Persona] | None = None
@@ -195,6 +214,12 @@ class SimulationOrchestrator:
         if "summary" in formats:
             p = self.exporter.export_summary_json(self.run.report, out / "summary.json")
             exported["summary"] = str(p)
+
+        if "html" in formats:
+            from src.exporters.html_report import HTMLReportExporter
+            html_exporter = HTMLReportExporter()
+            p = html_exporter.export(self.run.report, self.run.personas, out / "report.html")
+            exported["html"] = str(p)
 
         return exported
 
