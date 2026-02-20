@@ -43,6 +43,7 @@ def main():
 @click.option("--name", default="CLI Simulation Run", help="Name for this simulation run")
 @click.option("--personas", default=20, help="Number of personas to generate")
 @click.option("--max-turns", default=15, help="Max conversation turns")
+@click.option("--min-turns", default=1, help="Min conversation turns before allowing early exit (default: 1)")
 @click.option("--parallel", default=10, help="Max parallel conversations")
 @click.option("--output", default="./reports", help="Output directory for reports")
 @click.option("--export-formats", default="jsonl,csv,summary,html", help="Comma-separated export formats (jsonl,csv,summary,html,dpo)")
@@ -66,6 +67,7 @@ def run(
     name: str,
     personas: int,
     max_turns: int,
+    min_turns: int,
     parallel: int,
     output: str,
     export_formats: str,
@@ -119,6 +121,7 @@ def run(
             simulation_name=sim_name,
             num_personas=personas,
             max_turns=max_turns,
+            min_turns=min_turns,
         ))
         return
 
@@ -192,6 +195,7 @@ def run(
         name=name,
         num_personas=personas,
         max_turns=max_turns,
+        min_turns=min_turns,
         max_parallel=parallel,
         output_dir=output,
         export_formats=export_formats.split(","),
@@ -219,6 +223,7 @@ async def _run_partial_autonomous(
     simulation_name: str,
     num_personas: int | None = None,
     max_turns: int | None = None,
+    min_turns: int = 1,
 ):
     """Run the partial autonomous pipeline."""
     from src.core.autonomous_orchestrator import AutonomousOrchestrator
@@ -235,6 +240,7 @@ async def _run_partial_autonomous(
         simulation_name=simulation_name,
         num_personas=num_personas,
         max_turns=max_turns,
+        min_turns=min_turns,
     )
 
     if analysis_only:
@@ -352,6 +358,7 @@ async def _run_simulation(
     name: str,
     num_personas: int,
     max_turns: int,
+    min_turns: int,
     max_parallel: int,
     output_dir: str,
     export_formats: list[str],
@@ -381,6 +388,7 @@ async def _run_simulation(
         success_criteria=success_criteria,
         num_personas=num_personas,
         max_turns_per_conversation=max_turns,
+        min_turns_per_conversation=min_turns,
         max_parallel_conversations=max_parallel,
         pass_threshold=pass_threshold,
         warn_threshold=warn_threshold,

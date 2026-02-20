@@ -110,6 +110,7 @@ class AutonomousOrchestrator:
         simulation_name: str = "Partial Autonomous Simulation",
         num_personas: int | None = None,
         max_turns: int | None = None,
+        min_turns: int = 1,
     ):
         self.bot_endpoint = bot_endpoint
         self.doc_dir = doc_dir
@@ -122,6 +123,7 @@ class AutonomousOrchestrator:
         self.simulation_name = simulation_name
         self.num_personas = num_personas
         self.max_turns = max_turns
+        self.min_turns = min_turns
 
         # Gate setup
         if gate:
@@ -514,6 +516,7 @@ class AutonomousOrchestrator:
             success_criteria=success_criteria,
             num_personas=num_personas,
             max_turns_per_conversation=max_turns,
+            min_turns_per_conversation=self.min_turns,
             persona_types=persona_types,
             judges=judge_configs,
         )

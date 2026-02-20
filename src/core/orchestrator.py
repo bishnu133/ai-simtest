@@ -142,6 +142,7 @@ class SimulationOrchestrator:
                 personas=self.run.personas,
                 bot_config=self.config.bot,
                 max_turns=self.config.max_turns_per_conversation,
+                min_turns=getattr(self.config, 'min_turns_per_conversation', 1),
             )
 
             logger.info("conversations_done", count=len(self.run.conversations))
