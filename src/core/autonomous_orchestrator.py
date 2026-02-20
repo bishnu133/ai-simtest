@@ -11,8 +11,9 @@ Chains the document analysis stages with approval gates and simulation execution
     3. Generate → Success Criteria   → [Approval Gate 2]
     4. Generate → Guardrail Rules    → [Approval Gate 3]
     5. Generate → Test Plan          → [Approval Gate 4]
-    6. Execute simulation with approved configuration
-    7. Export results + audit trail
+    6. Generate → Personas           → [Approval Gate 5]
+    7. Execute simulation with approved personas
+    8. Export results + audit trail
 """
 
 from __future__ import annotations
@@ -264,14 +265,69 @@ class AutonomousOrchestrator:
             if gate_result.decision == GateDecision.MODIFIED and gate_result.modified_data:
                 result.test_plan = TestPlanGenerator.from_approval_data(gate_result.modified_data)
 
-            # ── Stage 5: Execute Simulation ──────────────────────
-            logger.info("pipeline_stage", stage=5, name="executing_simulation")
+            # ── Stage 5: Generate & Approve Personas ────────────
+            logger.info("pipeline_stage", stage=5, name="generating_personas")
             sim_config = self._build_simulation_config(result)
             sim_orchestrator = SimulationOrchestrator(sim_config)
-            result.simulation_report = await sim_orchestrator.run_simulation()
 
-            # ── Stage 6: Export Results ───────────────────────────
-            logger.info("pipeline_stage", stage=6, name="exporting_results")
+            # Generate personas only (no simulation yet)
+            personas = await sim_orchestrator.generate_personas_only()
+
+            if not personas:
+                result.aborted = True
+                result.abort_reason = "No personas generated"
+                return result
+
+            # Build persona items for approval gate
+            persona_items = self._personas_to_proposal_items(personas)
+
+            type_counts = {}
+            for p in personas:
+                t = p.persona_type.value if hasattr(p.persona_type, 'value') else str(p.persona_type)
+                type_counts[t] = type_counts.get(t, 0) + 1
+            type_summary = ", ".join(f"{c} {t}" for t, c in type_counts.items())
+
+            gate_result = await gate_manager.submit_gate(
+                gate_name="personas",
+                title="Test Personas",
+                description=f"Generated {len(personas)} personas ({type_summary}). "
+                            f"Remove unwanted personas before simulation.",
+                items=persona_items,
+                stage_number=5,
+            )
+
+            if gate_manager.was_rejected("personas"):
+                result.aborted = True
+                result.abort_reason = f"Personas rejected: {gate_result.reviewer_notes}"
+                return result
+
+            # Apply modifications — filter out removed personas
+            approved_personas = personas
+            if gate_result.decision == GateDecision.MODIFIED and gate_result.modified_data:
+                approved_personas = self._apply_persona_modifications(
+                    personas, gate_result.modified_data
+                )
+
+            if not approved_personas:
+                result.aborted = True
+                result.abort_reason = "All personas were removed"
+                return result
+
+            logger.info(
+                "personas_approved",
+                total_generated=len(personas),
+                total_approved=len(approved_personas),
+                removed=len(personas) - len(approved_personas),
+            )
+
+            # ── Stage 6: Execute Simulation with Approved Personas ─
+            logger.info("pipeline_stage", stage=6, name="executing_simulation")
+            result.simulation_report = await sim_orchestrator.run_simulation(
+                personas=approved_personas
+            )
+
+            # ── Stage 7: Export Results ───────────────────────────
+            logger.info("pipeline_stage", stage=7, name="exporting_results")
             exported = sim_orchestrator.export_results(
                 output_dir=self.output_dir,
                 formats=self.export_formats,
@@ -434,21 +490,9 @@ class AutonomousOrchestrator:
 
         # Persona config
         # num_personas = plan.persona_strategy.total_personas if plan else 20
-        # num_personas = self.num_personas or (plan.persona_strategy.total_personas if plan else 20)
-        if self.num_personas is not None and self.num_personas > 0:
-            num_personas = self.num_personas
-        elif plan:
-            num_personas = plan.persona_strategy.total_personas
-        else:
-            num_personas = 20
+        num_personas = self.num_personas or (plan.persona_strategy.total_personas if plan else 20)
         # max_turns = plan.conversation_config.max_turns if plan else 15
-        # max_turns = self.max_turns or (plan.conversation_config.max_turns if plan else 15)
-        if self.max_turns is not None and self.max_turns > 0:
-            max_turns = self.max_turns
-        elif plan:
-            max_turns = plan.conversation_config.max_turns
-        else:
-            max_turns = 15
+        max_turns = self.max_turns or (plan.conversation_config.max_turns if plan else 15)
 
         persona_types = {}
         if plan:
@@ -473,3 +517,76 @@ class AutonomousOrchestrator:
             persona_types=persona_types,
             judges=judge_configs,
         )
+
+    @staticmethod
+    def _personas_to_proposal_items(personas) -> list[dict[str, Any]]:
+        """Convert Persona objects to approval gate proposal items."""
+        items = []
+        for i, p in enumerate(personas):
+            p_type = p.persona_type.value if hasattr(p.persona_type, 'value') else str(p.persona_type)
+            tech = p.technical_level.value if hasattr(p.technical_level, 'value') else str(p.technical_level)
+
+            item_text = (
+                f"name: {p.name}\n"
+                f"type: {p_type}\n"
+                f"tone: {p.tone}\n"
+                f"tech_level: {tech}\n"
+                f"goals: {', '.join(p.goals[:3])}"
+            )
+
+            if p.topics:
+                item_text += f"\ntopics: {', '.join(p.topics[:3])}"
+
+            if p.adversarial_tactics:
+                item_text += f"\ntactics: {', '.join(p.adversarial_tactics[:3])}"
+
+            reasoning = f"{p_type.replace('_', ' ').title()} persona"
+            if p.adversarial_tactics:
+                reasoning += f" — tests: {', '.join(p.adversarial_tactics[:2])}"
+            else:
+                reasoning += f" — tests: {', '.join(p.goals[:2])}"
+
+            items.append({
+                "content": item_text,
+                "confidence": "high" if p_type == "standard" else "medium",
+                "reasoning": reasoning,
+            })
+
+        return items
+
+    @staticmethod
+    def _apply_persona_modifications(personas, modified_data) -> list:
+        """
+        Apply gate modifications to persona list.
+
+        Supports:
+        - removed_indices: list of 0-based indices to remove
+        - kept_items: list of approved items (by position)
+        """
+        if not modified_data:
+            return personas
+
+        # Handle removed_indices (from gate "remove 1,3" action)
+        removed_indices = set()
+        if "removed_indices" in modified_data:
+            removed_indices = {int(i) for i in modified_data["removed_indices"]}
+        elif "kept_items" in modified_data:
+            # Inverse: kept_items contains indices that survived
+            kept = {int(i) for i in modified_data["kept_items"]}
+            removed_indices = {i for i in range(len(personas)) if i not in kept}
+
+        if removed_indices:
+            approved = [
+                p for i, p in enumerate(personas)
+                if i not in removed_indices
+            ]
+            logger.info(
+                "personas_filtered",
+                original=len(personas),
+                removed=len(removed_indices),
+                remaining=len(approved),
+                removed_names=[personas[i].name for i in sorted(removed_indices) if i < len(personas)],
+            )
+            return approved
+
+        return personas

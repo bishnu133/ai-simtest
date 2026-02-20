@@ -288,14 +288,14 @@ class CLIApprovalGate(ApprovalGate):
     def _display_items_table(self, console, proposal: GateProposal) -> None:
         from rich.table import Table
 
-        table = Table(show_header=True, show_lines=True, title="Proposed Items")
+        table = Table(show_header=True, show_lines=True, title="Proposed Items", expand=True)
         table.add_column("#", style="dim", width=4)
-        table.add_column("Item", max_width=60)
+        table.add_column("Item", ratio=3, no_wrap=False)
 
         if self.show_confidence:
             table.add_column("Confidence", width=12)
         if self.show_explanations:
-            table.add_column("Reasoning", max_width=40)
+            table.add_column("Reasoning", ratio=2, no_wrap=False)
 
         for i, item in enumerate(proposal.items, 1):
             row = [str(i)]
@@ -305,7 +305,7 @@ class CLIApprovalGate(ApprovalGate):
             elif isinstance(item.content, dict):
                 key_parts = []
                 for k, v in list(item.content.items())[:5]:
-                    val_str = str(v)[:60]
+                    val_str = str(v)
                     key_parts.append(f"[bold]{k}[/]: {val_str}")
                 row.append("\n".join(key_parts))
             else:
@@ -316,7 +316,7 @@ class CLIApprovalGate(ApprovalGate):
                 row.append(f"[{conf_color}]{item.confidence.value}[/]")
 
             if self.show_explanations and item.explanation:
-                row.append(f"[dim]{item.explanation[:100]}[/]")
+                row.append(f"[dim]{item.explanation}[/]")
             elif self.show_explanations:
                 row.append("")
 
@@ -328,9 +328,7 @@ class CLIApprovalGate(ApprovalGate):
         from rich.syntax import Syntax
 
         json_str = json.dumps(proposal.raw_data, indent=2, default=str)
-        if len(json_str) > 2000:
-            json_str = json_str[:2000] + "\n... (truncated)"
-        syntax = Syntax(json_str, "json", theme="monokai")
+        syntax = Syntax(json_str, "json", theme="monokai", word_wrap=True)
         console.print(syntax)
 
     def _prompt_decision(self, console, proposal: GateProposal) -> str:
@@ -536,11 +534,11 @@ class CLIApprovalGate(ApprovalGate):
 
     def _item_display(self, item: Any) -> str:
         if isinstance(item, str):
-            return item[:100]
+            return item
         elif isinstance(item, dict):
-            parts = [f"[bold]{k}[/]={str(v)[:40]}" for k, v in item.items()]
+            parts = [f"[bold]{k}[/]={str(v)}" for k, v in item.items()]
             return " | ".join(parts)
-        return str(item)[:100]
+        return str(item)
 
     def _modify_raw_data(self, console, proposal: GateProposal, modifications: list[str]) -> tuple[dict, list[str]]:
         import click
