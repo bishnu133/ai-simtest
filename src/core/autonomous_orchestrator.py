@@ -107,6 +107,8 @@ class AutonomousOrchestrator:
         output_dir: str = "./reports",
         export_formats: list[str] | None = None,
         simulation_name: str = "Partial Autonomous Simulation",
+        num_personas: int | None = None,
+        max_turns: int | None = None,
     ):
         self.bot_endpoint = bot_endpoint
         self.doc_dir = doc_dir
@@ -117,6 +119,8 @@ class AutonomousOrchestrator:
         self.output_dir = output_dir
         self.export_formats = export_formats or ["jsonl", "csv", "summary", "html"]
         self.simulation_name = simulation_name
+        self.num_personas = num_personas
+        self.max_turns = max_turns
 
         # Gate setup
         if gate:
@@ -429,8 +433,22 @@ class AutonomousOrchestrator:
             ]
 
         # Persona config
-        num_personas = plan.persona_strategy.total_personas if plan else 20
-        max_turns = plan.conversation_config.max_turns if plan else 15
+        # num_personas = plan.persona_strategy.total_personas if plan else 20
+        # num_personas = self.num_personas or (plan.persona_strategy.total_personas if plan else 20)
+        if self.num_personas is not None and self.num_personas > 0:
+            num_personas = self.num_personas
+        elif plan:
+            num_personas = plan.persona_strategy.total_personas
+        else:
+            num_personas = 20
+        # max_turns = plan.conversation_config.max_turns if plan else 15
+        # max_turns = self.max_turns or (plan.conversation_config.max_turns if plan else 15)
+        if self.max_turns is not None and self.max_turns > 0:
+            max_turns = self.max_turns
+        elif plan:
+            max_turns = plan.conversation_config.max_turns
+        else:
+            max_turns = 15
 
         persona_types = {}
         if plan:

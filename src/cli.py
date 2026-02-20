@@ -117,6 +117,8 @@ def run(
             output_dir=output,
             export_formats=export_formats.split(","),
             simulation_name=sim_name,
+            num_personas=personas,
+            max_turns=max_turns,
         ))
         return
 
@@ -215,6 +217,8 @@ async def _run_partial_autonomous(
     output_dir: str,
     export_formats: list[str],
     simulation_name: str,
+    num_personas: int | None = None,
+    max_turns: int | None = None,
 ):
     """Run the partial autonomous pipeline."""
     from src.core.autonomous_orchestrator import AutonomousOrchestrator
@@ -229,6 +233,8 @@ async def _run_partial_autonomous(
         output_dir=output_dir,
         export_formats=export_formats,
         simulation_name=simulation_name,
+        num_personas=num_personas,
+        max_turns=max_turns,
     )
 
     if analysis_only:
